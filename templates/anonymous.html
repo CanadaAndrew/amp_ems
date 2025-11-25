@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Amptier Anonymous Report Page</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- JavaScript to handle the pop-up display to file a complaint-->
+     <script>
+        window.onload = () =>{
+            const reportModule = document.getElementById('reportModule');
+            const fileComplaintButton = document.getElementById('file_complaint_button');
+            const submitButton = document.getElementById('submit_button');
+            const cancelButton = document.getElementById('cancel_button');
+
+            const turnOnReportModule = () =>{
+                reportModule.hidden = false;
+            }
+            const turnOffReportModule = () =>{
+                reportModule.hidden = true;
+            }
+
+            fileComplaintButton.addEventListener('click', turnOnReportModule);
+            cancelButton.addEventListener('click', turnOffReportModule);
+        }
+     </script>
+</head> 
+    <body class= "min-h-screen bg-[#abccf7]">
+        <!--Header displaying Rexus Group and Amptier-->
+            <div class = "justify-between flex bg-blue-900 h-[16vh] w-screen">
+                <div class = "w-[33vw]">
+                    <!--Display time and weather for Roseville/Sacramento-->
+                    
+                </div>
+                <div class = "text-center w-[33vw] py-[4vh]">
+                    <h1 class = "text-white text-3xl font-bold">Anonymous Dashboard</h1>
+                </div>
+                <div class = "flex object-contain flex-col w-[33vw] ">
+                    <img class = "sm:h-[8vh] object-contain" src="{{ url_for('static', filename='amptier_logo-removebg-preview.png') }}" alt="Amptier Logo"/>
+                    <img class = "sm:h-[8vh] object-contain" src="{{ url_for('static', filename='rexus_logo.png')}}" alt="Rexus Logo"/>
+                </div>
+            </div>
+        <!--File a new complaint button-->
+        <div class="flex justify-center mt-10">
+            <button id="file_complaint_button" class="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 text-center">
+                <h1 class = "text-xl">File a complaint</h1>
+                <p class = "text-sm">Report Sewer, Flooding, Water, Fire, or Other Issues</p>
+            </button>
+        </div>
+
+        <!--The Reporting Module when file a complaint is clicked-->
+        <div id="reportModule" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
+            <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] h-[75vh]sm:h-[36vh]">
+                <h2 class="text-center text-2xl text-blue-900 mt-4">File a Complaint</h2>
+                <form id="complaint-form" action="{{url_for('submit_complaint')}}" method="post" class="flex flex-col items-center gap-3 px-6 mt-4">
+                    <h3 class = "text-xl">Category</h3>
+                    <select name="Category" class ="border border-black rounded-lg w-full" required >
+                        <option value="" disabled selected>Select Category</option>
+                        <option value="Sewer">Sewer</option>
+                        <option value="Flooding">Flooding</option>
+                        <option value="Water">Water</option>
+                        <option value="Fire">Fire</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <h3 class = "text-xl">Severity</h3>
+                    <select name="Severity" class ="border border-black rounded-lg w-full" required >
+                        <option value="" disabled selected>Select Severity</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                    </select>
+                    <h3 class = "text-xl">Description</h3>
+                    <input name = "Description" class = "border border-black rounded-lg w-full" placeholder = "Describe the issue. 128 Characters max." required maxlength="128">
+                    </input>
+                    <h3 class = "text-xl">Location (Optional)</h3>
+                    <input name = "Location" class = "border border-black rounded-lg w-full" placeholder = "Provide a specific location. Inputs Sacramento if left blank. Max 64 Characters." maxlength="64">              
+                    </input>
+                    <h3 class = "text-xl">Images (Optional)</h3>
+                    <input type="file" name="Images" class="w-full" accept="image/*" multiple />
+                    <div class = "justify-evenly px-4 w-full flex">
+                        <button id = "cancel_button" class = "px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Cancel</button>
+                        <button id ="submit_button" class = "px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "submit">Submit</button>
+                    </div>
+                    <input type ="hidden" name ="ID" value="0"/>
+                </form>
+            </div>
+        </div>
+
+        <!--Recent complaints nearby-->
+        <div class="flex flex-col items-center mt-10 px-6">
+            <h2 class="text-2xl text-blue-900 mb-4">Recent Complaints in Sacramento</h2>
+            <div class="w-full max-w-3xl space-y-4">
+                <!-- Example complaint card -->
+                <div class="bg-white p-4 rounded-md shadow-md">
+                    <h3 class="text-lg font-semibold text-blue-900">Pothole on Main St.</h3>
+                    <p class="text-gray-700">Reported 2 hours ago</p>
+                    <p class="text-gray-600 mt-2">There is a large pothole on Main St. near the intersection with 5th Ave. It is causing traffic issues.</p>
+                </div>
+                <div class="bg-white p-4 rounded-md shadow-md">
+                    <h3 class="text-lg font-semibold text-blue-900">Water Leak on 3rd Ave.</h3>
+                    <p class="text-gray-700">Reported 5 hours ago</p>
+                    <p class="text-gray-600 mt-2">A water leak has been observed on 3rd Ave. near the park. It seems to be getting worse.</p>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
