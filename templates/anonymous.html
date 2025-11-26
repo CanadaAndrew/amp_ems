@@ -26,16 +26,20 @@
      </script>
 </head> 
     <body class= "min-h-screen bg-[#abccf7]">
-        <!--Header displaying Rexus Group and Amptier-->
             <div class = "justify-between flex bg-blue-900 h-[16vh] w-screen">
-                <div class = "w-[33vw]">
+                <div class = "w-[33vw] flex flex-col px-2 justify-between">
                     <!--Display time and weather for Roseville/Sacramento-->
-                    
+                    <div>
+                        <div class = "text-white text-left text-2xl">Weather in {{ weather["city"] }}</div>
+                        <div class = "text-white text-left text-xl">{{ weather["temperature"] }}°F, {{ weather["description"]}}</div>
+                        <div class = "text-white text-left text-xl">Current Time: {{ current_time }}</div>
+                    </div>
                 </div>
                 <div class = "text-center w-[33vw] py-[4vh]">
                     <h1 class = "text-white text-3xl font-bold">Anonymous Dashboard</h1>
                 </div>
-                <div class = "flex object-contain flex-col w-[33vw] ">
+            <!--Header displaying Rexus Group and Amptier-->
+                <div class = "flex object-contain flex-col w-[33vw] justify-end items-end">
                     <img class = "sm:h-[8vh] object-contain" src="{{ url_for('static', filename='amptier_logo-removebg-preview.png') }}" alt="Amptier Logo"/>
                     <img class = "sm:h-[8vh] object-contain" src="{{ url_for('static', filename='rexus_logo.png')}}" alt="Rexus Logo"/>
                 </div>
@@ -52,7 +56,7 @@
         <div id="reportModule" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
             <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] h-[75vh]sm:h-[36vh]">
                 <h2 class="text-center text-2xl text-blue-900 mt-4">File a Complaint</h2>
-                <form id="complaint-form" action="{{url_for('submit_complaint')}}" method="post" class="flex flex-col items-center gap-3 px-6 mt-4">
+                <form id="complaint-form" class="flex flex-col items-center gap-3 px-6 mt-4" enctype="multipart/form-data" action="{{url_for('submit_complaint')}}" method="post">
                     <h3 class = "text-xl">Category</h3>
                     <select name="Category" class ="border border-black rounded-lg w-full" required >
                         <option value="" disabled selected>Select Category</option>
@@ -83,26 +87,34 @@
                         <button id = "cancel_button" class = "px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Cancel</button>
                         <button id ="submit_button" class = "px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "submit">Submit</button>
                     </div>
-                    <input type ="hidden" name ="ID" value="0"/>
+                    <input type ="hidden" name ="ID" value="1"/>
                 </form>
             </div>
         </div>
 
         <!--Recent complaints nearby-->
         <div class="flex flex-col items-center mt-10 px-6">
-            <h2 class="text-2xl text-blue-900 mb-4">Recent Complaints in Sacramento</h2>
-            <div class="w-full max-w-3xl space-y-4">
-                <!-- Example complaint card -->
+            <h2 class="text-2xl text-blue-900 mb-4">Recent Complaints</h2>
+            <div class="w-full max-w-3xl space-y-4 overflow-y-auto h-[60vh]">
+                 {% for r in reports %}
                 <div class="bg-white p-4 rounded-md shadow-md">
-                    <h3 class="text-lg font-semibold text-blue-900">Pothole on Main St.</h3>
-                    <p class="text-gray-700">Reported 2 hours ago</p>
-                    <p class="text-gray-600 mt-2">There is a large pothole on Main St. near the intersection with 5th Ave. It is causing traffic issues.</p>
+                    <h3 class="text-lg font-semibold text-blue-900">{{ r['category'] }} - Severity {{ r['severity'] }}</h3>
+                    <p class="text-gray-700">Reported {{ r['t_diff'] }}</p>
+                    <p class="text-gray-600 mt-2">{{ r['descr'] }}</p>
+                    <p class="text-gray-600 mt-1">Location: {{ r['locat'] }}</p>
+                    <p class="text-gray-600 mt-1">Status: {{ r['resolved'] }}</p>
+                    {%if r['images'] %}
+                    <div class="mt-2">
+                        <h4 class="font-semibold text-blue-900">Images:</h4>
+                        <div class="flex space-x-2 mt-1">
+                            {% for img in r['images'] %}
+                                <img src="data:{{ img['mime_type'] }};base64,{{ img['b64'] }}" alt="Report Image" class="w-[20%] h-auto object-contain rounded-md"/>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="bg-white p-4 rounded-md shadow-md">
-                    <h3 class="text-lg font-semibold text-blue-900">Water Leak on 3rd Ave.</h3>
-                    <p class="text-gray-700">Reported 5 hours ago</p>
-                    <p class="text-gray-600 mt-2">A water leak has been observed on 3rd Ave. near the park. It seems to be getting worse.</p>
-                </div>
+                {% endfor %}
             </div>
         </div>
     </body>
