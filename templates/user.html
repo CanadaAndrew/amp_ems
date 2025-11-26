@@ -2,7 +2,7 @@
 <html lang = "en">
 <head>
     <meta charset="UTF-8"/>
-    <title>Amptier Anonymous Report Page</title>
+    <title>Amptier User Report Page</title>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- JavaScript to handle the pop-up display to file a complaint-->
@@ -12,14 +12,27 @@
             const fileComplaintButton = document.getElementById('file_complaint_button');
             const submitButton = document.getElementById('submit_button');
             const cancelButton = document.getElementById('cancel_button');
-
+            const userButton = document.getElementById('user_button');
+            const userComplaintsModule = document.getElementById('user_complaints_module');
+            const closeUserComplaintsButton = document.getElementById('close_user_complaints_button');
             const turnOnReportModule = () =>{
                 reportModule.hidden = false;
             }
             const turnOffReportModule = () =>{
                 reportModule.hidden = true;
             }
-
+            const turnOnUserComplaintsModule = () =>{
+                userComplaintsModule.hidden = false;
+            }
+            const turnOffUserComplaintsModule = () =>{
+                userComplaintsModule.hidden = true;
+            }
+            if (userButton){
+                userButton.addEventListener('click', turnOnUserComplaintsModule);
+            }
+            if (closeUserComplaintsButton){
+                closeUserComplaintsButton.addEventListener('click', turnOffUserComplaintsModule);
+            }
             fileComplaintButton.addEventListener('click', turnOnReportModule);
             cancelButton.addEventListener('click', turnOffReportModule);
         }
@@ -36,7 +49,7 @@
                     </div>
                 </div>
                 <div class = "text-center w-[33vw] py-[4vh]">
-                    <h1 class = "text-white text-3xl font-bold">Anonymous Dashboard</h1>
+                    <h1 class = "text-white text-3xl font-bold">{{ user_name }}'s User Dashboard</h1>
                 </div>
             <!--Header displaying Rexus Group and Amptier-->
                 <div class = "flex object-contain flex-col w-[33vw] justify-end items-end">
@@ -87,10 +100,48 @@
                         <button id = "cancel_button" class = "px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Cancel</button>
                         <button id ="submit_button" class = "px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "submit">Submit</button>
                     </div>
-                    <input type ="hidden" name ="ID" value="1"/>
+                    <input type ="hidden" name ="ID" value="{{ user_id }}"/>
                 </form>
             </div>
         </div>
+
+        <!--If not anonymous, displays button to show your complaints-->
+        {% if user_id != "1" %}
+        <div class="flex justify-center mt-4">
+            <button id = "user_button" type = "button" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">See Your Complaints</button>
+        </div>
+
+        <div id = "user_complaints_module" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
+            <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] max-h-[75vh]">
+                <h2 class="text-center text-2xl text-blue-900 mt-4">Your Complaints</h2>
+                <div class="w-full max-w-3xl space-y-4 overflow-y-auto h-[60vh] px-4">
+                     {% for r in user_reports %}
+                    <div class="bg-white p-4 rounded-md shadow-md border border-black">
+                        <h3 class="text-lg font-semibold text-blue-900">{{ r['category'] }} - Severity {{ r['severity'] }}</h3>
+                        <p class="text-gray-700">Reported {{ r['t_diff'] }}</p>
+                        <p class="text-gray-600 mt-2">{{ r['descr'] }}</p>
+                        <p class="text-gray-600 mt-1">Location: {{ r['locat'] }}</p>
+                        <p class="text-gray-600 mt-1">Status: {{ r['resolved'] }}</p>
+                        <p class="text-gray-600 mt-1">Admin Notes: {{ r['admin_notes'] }}</p>
+                        {%if r['images'] %}
+                        <div class="mt-2">
+                            <h4 class="font-semibold text-blue-900">Images:</h4>
+                            <div class="flex space-x-2 mt-1">
+                                {% for img in r['images'] %}
+                                    <img src="data:{{ img['mime_type'] }};base64,{{ img['b64'] }}" alt="Report Image" class="w-[20%] h-auto object-contain rounded-md"/>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class = "flex justify-center mb-4">
+                        <button id = "close_user_complaints_button" class = "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Close</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!--Recent complaints nearby-->
         <div class="flex flex-col items-center mt-10 px-6">
@@ -103,6 +154,7 @@
                     <p class="text-gray-600 mt-2">{{ r['descr'] }}</p>
                     <p class="text-gray-600 mt-1">Location: {{ r['locat'] }}</p>
                     <p class="text-gray-600 mt-1">Status: {{ r['resolved'] }}</p>
+                    <p class="text-gray-600 mt-1">Admin Notes: {{ r['admin_notes'] }}</p>
                     {%if r['images'] %}
                     <div class="mt-2">
                         <h4 class="font-semibold text-blue-900">Images:</h4>

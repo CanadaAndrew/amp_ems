@@ -19,23 +19,23 @@
         <p class="text-center text-sm text-gray-200 mb-4">Enterprise Emergency &amp; Operations Management</p>
 
         <!-- Form inputs to input username and password -->
-        <form id="login-form" action="/login" method="post" class="flex flex-col items-center gap-3 px-6">
+        <form id="login-form"  method="post" class="flex flex-col items-center gap-3 px-6">
             <input name="username" placeholder="Username" required
                    class="w-full md:w-3/4 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
             <input type="password" name="password" placeholder="Password" required
                    class="w-full md:w-3/4 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-        </form>
-
+        
         <!-- Buttons to choose if signing in as a user or admin -->
         <div class="flex justify-evenly mt-4 px-6">
-            <button form="login-form" type="submit" name="role" value="admin"
+            <button form="login-form" formaction="{{url_for('admin')}}" type="submit" name="role" value="admin"
                     class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Admin Login</button>
-            <button form="login-form" type="submit" name="role" value="user"
+            <button form="login-form" formaction="{{ url_for('user', user_id=0) }}" type="submit" name="role" value="user"
                     class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">User Login</button>
         </div>
+        </form>
 
         <p class="text-center text-sm text-gray-200 mt-4">
-            Don't have a user account? Report <a class="underline text-white" href="{{ url_for('anonymous') }}">anonymously</a>
+            Don't have a user account? Report <a class="underline text-white" href="{{ url_for('user', user_id='1') }}">anonymously</a>
         </p>
     </div>
 </body>
