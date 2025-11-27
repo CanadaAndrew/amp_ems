@@ -4,6 +4,7 @@
     <meta charset="UTF-8"/>
     <title>Amptier Admin Dashboard Page</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
     <script>
         window.onload = () =>{
             //Getting all the buttons by ID
@@ -14,12 +15,19 @@
             const viewSewerButton = document.getElementById('view_sewer');
             const viewOtherButton = document.getElementById('view_other');
             const closeAdminComplaintsButton = document.getElementById('close_admin_complaints_button');
+            const addUserButton = document.getElementById('add_user_button');
+            const cancelUserButton = document.getElementById('user_cancel_button');
+
+            //Maps to store changes made by admin
+            const statusChanges = new Map();
+            const noteChanges = new Map();
 
             //Getting the top text element to change based on button clicks
             const adminCategoryText = document.getElementById('admin_category');
 
             //Getting the Module to show/hide
             const adminCategoryViewer = document.getElementById('Admin_Category_Viewer');
+            const addUserModule = document.getElementById('add_user_module');
 
             //Getting all the reports
             const allReports = document.querySelectorAll('.report-card');
@@ -28,7 +36,15 @@
                 adminCategoryViewer.hidden = false;
             }
             const hideReportModule = () => {
+                statusChanges.clear();
+                noteChanges.clear();
                 adminCategoryViewer.hidden = true;
+            }
+            const showAddUserModule = () => {
+                addUserModule.hidden = false;
+            }
+            const hideAddUserModule = () => {
+                addUserModule.hidden = true;
             }
 
             //Function to show all reports
@@ -63,6 +79,151 @@
             viewSewerButton.addEventListener('click', () => showOneCategory("Sewer"));
             viewOtherButton.addEventListener('click', () => showOneCategory("Other"));
             closeAdminComplaintsButton.addEventListener('click', hideReportModule);
+            addUserButton.addEventListener('click', showAddUserModule);
+            cancelUserButton.addEventListener('click', hideAddUserModule);
+
+            //Marks a change when status are edited
+            function markStatusChanged(reportId){
+                //Selects the elements of the report being changed
+                //Creates the payload to be sent to the server
+                const statusElement = document.querySelector(`.status-select[data-report-id="${reportId}"]`);                
+                const payload = {
+                    report_id: parseInt(reportId),
+                    resolved: statusElement.value                
+                };
+                //Stores the change in the map to be submitted
+                statusChanges.set(reportId, payload);
+            }
+            //Marks a change when admin notes are edited
+            function markNotesChanged(reportId){
+                //Selects the elements of the report being changed
+                const adminNotesElement = document.querySelector(`.admin-notes[data-report-id="${reportId}"]`);
+                //Creates the payload to be sent to the server
+                const payload = {
+                    report_id: parseInt(reportId),
+                    admin_notes: adminNotesElement.value
+                };
+                //Stores the change in the map to be submitted
+                noteChanges.set(reportId, payload);
+            }
+
+            //Puting Event Listeners on the respective elements
+            document.querySelectorAll('.status-select').forEach((statusElement) =>{
+                statusElement.addEventListener('change', () =>{
+                    markStatusChanged(statusElement.getAttribute('data-report-id'));
+                });
+            });
+            document.querySelectorAll('.admin-notes').forEach((notesElement) =>{
+                notesElement.addEventListener('change', () =>{
+                    markNotesChanged(notesElement.getAttribute('data-report-id'));
+                });
+            });
+
+            //Save button functionality
+            const saveChangesButton = document.getElementById('admin_save_changes_button');
+
+            //Sends the changes over to the server to be updated in the database
+            const saveChanges = async () => {
+                //Checks if there are any changes first
+                if(statusChanges.size === 0 && noteChanges.size === 0){
+                    alert("No changes to save.");
+                    return;
+                }
+                //Combines both arrays into one object to send
+                const updates = {
+                    statuses: Array.from(statusChanges.values()),
+                    notes: Array.from(noteChanges.values())
+                }
+                try{
+                    const res = await fetch('{{ url_for("admin_update_reports") }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(updates)
+                    });
+                    const data = await res.json();
+                    if(data.success){
+                        alert('Saved');
+                        // Clear the changes after successful save, reloads the page to reflect updates
+                        window.location.reload();
+                        statusChanges.clear();
+                        noteChanges.clear();
+                    }
+                }catch(error){
+                    console.error('Error saving changes:', error);
+                    alert('Error saving changes. Please try again.');
+                }
+            }
+            //Adding event listener to the save button
+            saveChangesButton.addEventListener('click', saveChanges);
+
+            //Getting canvas elements for the charts
+            const categoryChartCanvas = document.getElementById('category_chart')?.getContext('2d');
+            const statusChartCanvas = document.getElementById('status_chart')?.getContext('2d');
+            //Getting statuses to filter
+            const statusSelects = Array.from(document.querySelectorAll('.status-select'));
+            //Updating charts
+            const categoryXValues = ["Flooding", "Water", "Fire", "Sewer", "Other"];
+            const categoryYValues = categoryXValues.map(category =>
+                document.querySelectorAll(`[data-category="${category}"]`).length
+            );
+            const statusLabels = ["Resolved", "Not Resolved"];
+            const resolvedCount = statusSelects.filter(s => String(s.value) === "Resolved").length;
+            const notResolvedCount = statusSelects.length - resolvedCount;
+            const statusData = [resolvedCount, notResolvedCount];
+            
+            if(categoryChartCanvas){
+                new Chart(categoryChartCanvas, {
+                    type: "bar",
+                    data: {
+                        labels: categoryXValues,
+                        datasets: [{
+                            backgroundColor: ["blue", "gray", "yellow", "red", "purple"],
+                            data: categoryYValues
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: "Reports by Category"
+                            }
+                        }
+                    }
+                });
+            }
+
+
+            if(statusChartCanvas){
+                new Chart(statusChartCanvas, {
+                type: "doughnut",
+                data: {
+                    labels: statusLabels,
+                    datasets: [{
+                        label: "Report Status",
+                        backgroundColor: ["green", "orange"],
+                        data: statusData
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: "Report Status Distribution"
+                        }
+                    }
+                }
+            });
+            }
         }
 
     </script>
@@ -88,25 +249,30 @@
     </div>
     <!--Button to add new users-->
     <div class = "flex justify-end m-4">
-        <button type = "button" class = "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add New User</button>
+        <button id="add_user_button" type = "button" class = "px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Add New User</button>
 
-        <div id="addUserModule" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
+        <div id="add_user_module" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
             <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] h-[75vh]sm:h-[36vh]">
                 <h2 class="text-center text-2xl text-blue-900 mt-4">Adding a user</h2>
                 <form id="addUserForm" class="flex flex-col items-start gap-3 px-6 py-5 mt-4" action="{{url_for('submit_user')}}" method="post">
-                    <input name="username" placeholder="Username" required
+                    <input name="Username" placeholder="Username" required
                            class="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                    <input type="password" name="password" placeholder="Password" required
+                    <input type="password" name="Password" placeholder="Password" required
                            class="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    <input name = "Phone_Number" placeholder="Phone Number(Optional)"
+                            class="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                    <input name = "Email" placeholder="Email(Optional)"
+                            class="w-full px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                     <select name="Admin" class ="border border-black rounded-lg w-full" required >
                         <option value="" disabled selected>Select Role</option>
                         <option value="Admin">Admin</option>
                         <option value="User">User</option>
                     </select>
                     <div class = "justify-evenly px-4 w-full flex">
-                        <button id = "cancel_button" class = "px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Cancel</button>
-                        <button id ="submit_button" class = "px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "submit">Submit</button>
+                        <button id = "user_cancel_button" class = "px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Cancel</button>
+                        <button id ="user_submit_button" class = "px-2 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "submit">Submit</button>
                     </div>
+                    <input type ="hidden" name ="Admin_Id" value="{{ user_id }}"/>
                 </form>
             </div>
         </div>
@@ -122,15 +288,23 @@
         <div id = "Admin_Category_Viewer" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
         <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] max-h-[75vh]">
             <h2 id = "admin_category" class="text-center text-2xl text-blue-900 mt-4">Categories</h2>
-            <div class="w-full max-w-3xl space-y-4 overflow-y-auto h-[60vh] px-4">
+            <div class="w-full space-y-4 overflow-y-auto h-[60vh] px-4">
                     {% for r in reports %}
                 <div data-category="{{ r['category'] }}" class="report-card bg-white p-4 rounded-md shadow-md border border-black">
                     <h3 class="text-lg font-semibold text-blue-900">{{ r['category'] }} - Severity {{ r['severity'] }}</h3>
                     <p class="text-gray-700">Reported {{ r['t_diff'] }}</p>
                     <p class="text-gray-600 mt-2">{{ r['descr'] }}</p>
                     <p class="text-gray-600 mt-1">Location: {{ r['locat'] }}</p>
-                    <p class="text-gray-600 mt-1">Status: {{ r['resolved'] }}</p>
-                    <p class="text-gray-600 mt-1">Admin Notes: {{ r['admin_notes'] }}</p>
+                    <!--Editable Status and Admin Notes-->
+                    <p class="text-gray-600 mt-1">Status:
+                        <select class = "status-select" data-report-id="{{r['report_id']}}" placeholder="{{r['resolved']}}">
+                        <option value = "Not Resolved" {% if r['resolved'] == 'Not Resolved' %}selected{% endif %}>Not Resolved</option>
+                        <option value = "Resolved" {% if r['resolved'] == 'Resolved' %}selected{% endif %}>Resolved</option>
+                    </select>
+                    </p>
+                    <p class="text-gray-600 mt-1">Admin Notes: 
+                        <input type="text" class = "admin-notes w-full border border-gray-400 rounded-md" data-report-id="{{r['report_id']}}" value="{{r['admin_notes']}}" />
+                    </p>
                     {%if r['images'] %}
                     <div class="mt-2">
                         <h4 class="font-semibold text-blue-900">Images:</h4>
@@ -146,13 +320,17 @@
             </div>
             <div class = "flex justify-center mb-4">
                     <button id = "close_admin_complaints_button" class = "px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-center" type = "button">Close</button>
+                    <button id ="admin_save_changes_button" class = "ml-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-center" type = "button">Save Changes</button>
             </div>
         </div>
     </div>
     </div>
 
     <!--Tables displaying statistics, categories of reports, and month reports-->
-
-
+    <div class = "text-5xl text-white text-center bg-blue-900 w-[25vw] h-auto justify-self-center rounded-lg ">Statistics</div>
+    <div class = "flex justify-evenly w-screen py-8">
+        <canvas id="category_chart" class = "max-w-[25vw] max-h-[25vh] object-contain h-auto bg-white rounded-lg shadow-md border border-black"></canvas>
+        <canvas id="status_chart" class = "max-w-[25vw] max-h-[25vh] object-contain h-auto bg-white rounded-lg shadow-md border border-black"></canvas>
+    </div>
     <!--Map using Leaflet API to display where everything is located-->
 </body>

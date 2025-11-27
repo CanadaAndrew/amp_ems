@@ -1,6 +1,6 @@
 import base64
 import datetime
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, json, render_template, request, redirect, url_for, jsonify
 import mysql.connector
 import os
 from dotenv import load_dotenv
@@ -152,7 +152,7 @@ def fetch_user_info(conn, login_info):
     }
     login_cursor = conn.cursor(dictionary=True)
     login_cursor.execute("""
-        SELECT user_id, user_name
+        SELECT user_id, user_name, admin
         FROM Users
         WHERE user_name = %s AND pass = %s
     """, (login_info["username"], login_info["password"]))
@@ -160,11 +160,80 @@ def fetch_user_info(conn, login_info):
     if user:
         user_info["user_id"] = user["user_id"]
         user_info["user_name"] = login_info["username"]
+        user_info["admin"] = user["admin"]
     else:
         login_cursor.close()
         conn.close()
     login_cursor.close()
     return user_info
+
+def fetch_user_info_by_id(conn, user_id):
+    user_info={
+        "user_id": None,
+        "user_name": "Anonymous"
+    }
+    login_cursor = conn.cursor(dictionary=True)
+    login_cursor.execute("""
+        SELECT user_id, user_name, admin
+        FROM Users
+        WHERE user_id = %s
+    """, (str(user_id),))
+    user = login_cursor.fetchone()
+    if user:
+        user_info["user_id"] = user["user_id"]
+        user_info["user_name"] = user["user_name"]
+        user_info["admin"] = user["admin"]
+    login_cursor.close()
+    return user_info
+
+def add_user(conn, user_data):
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO Users(user_name, pass, phone_number, email, admin)
+        VALUES(%s, %s, %s, %s, %s)
+        """
+    admin_value = True if user_data['admin'] == 'Admin' else False
+    params = (
+        user_data['username'],
+        user_data['password'],
+        user_data['phone_number'],
+        user_data['email'],
+        admin_value
+    )
+    cursor.execute(query, params)
+    conn.commit()
+    cursor.close()
+
+def update_report_status(conn, report_id, status):
+    cursor = conn.cursor()
+    status = True if status == "Resolved" else False
+    query = """
+        UPDATE Reports
+        SET resolved = %s
+        WHERE report_id = %s
+    """
+    parameters = (
+        status,
+        report_id
+    )
+    cursor.execute(query, parameters)
+    conn.commit()
+    cursor.close()
+
+def update_report_admin_notes(conn, report_id, admin_notes):
+    cursor = conn.cursor()
+    query = """
+        UPDATE Reports
+        SET admin_notes = %s
+        WHERE report_id = %s
+    """
+    parameters = (
+        admin_notes,
+        report_id
+    )
+    cursor.execute(query, parameters)
+    conn.commit()
+    cursor.close()
 
 @app.route("/")
 def home():
@@ -183,8 +252,8 @@ def user(user_id = None):
     }
     if int(user_id) == 0:
         login_info = {
-            "username": request.form.get("username"),
-            "password": request.form.get("password")
+            "username": request.form.get("Username"),
+            "password": request.form.get("Password")
         }
         user_info = fetch_user_info(conn, login_info)
         if user_info["user_id"] is None:
@@ -208,7 +277,32 @@ def user(user_id = None):
     #Fetching weather data for Sacramento
     weather = fetch_weather()
 
-    return render_template("user.html", reports=reports, user_reports=user_reports, weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"])
+    return render_template("user.html", reports=reports, user_reports=user_reports, weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"].capitalize())
+
+@app.route("/reload_user/<user_id>")
+def reload_user(user_id = None):
+    conn = get_db_connection()
+    yesterdays_date = (datetime.datetime.now() - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+    user_info = fetch_user_info_by_id(conn, user_id)
+
+    #Fetching recent reports
+    reports = fetch_recent_reports(conn, yesterdays_date)
+
+    #Fetching images for each report
+    reports = fetch_report_images(conn, reports)
+
+    #Fetching user reports if not anonymous
+    user_reports = None
+    if user_id != "1":
+        user_reports = fetch_user_reports(conn, user_id)
+        user_reports = fetch_report_images(conn, user_reports)
+    conn.close()
+
+    #Fetching weather data for Sacramento
+    weather = fetch_weather()
+
+    return render_template("user.html", reports=reports, user_reports=user_reports, weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"].capitalize())
 
 @app.route("/submit_complaint", methods=["POST"])
 def submit_complaint():
@@ -237,9 +331,9 @@ def submit_complaint():
     try:
         #Inputing the report query, setting the params and then executing it.
         params = (
-        int(report["user_id"]) if report["user_id"] else 0,
+        int(report["user_id"]) if report["user_id"] else 1,
         report["category"],
-        int(report["severity"]) if report["severity"] else 0,
+        int(report["severity"]) if report["severity"] else 1,
         report["description"] or None,
         report["location"] or "Sacramento",
         report["timestamp"],
@@ -266,10 +360,10 @@ def submit_complaint():
     if(report["user_id"] == "1"):
         return redirect(url_for("user", user_id=1))
     else:
-        return redirect(url_for("user", user_id=int(report["user_id"])))
+        return redirect(url_for("reload_user", user_id=report["user_id"]))
     
 @app.route("/admin", methods=["GET", "POST"])
-def admin():
+def admin(user_name=None, password=None):
     conn = get_db_connection()
     user_id = 0
     #Taking the information from the forms and validating user login
@@ -280,11 +374,11 @@ def admin():
     }
     if int(user_id) == 0:
         login_info = {
-            "username": request.form.get("username"),
-            "password": request.form.get("password")
+            "username": request.form.get("Username"),
+            "password": request.form.get("Password")
         }
         user_info = fetch_user_info(conn, login_info)
-        if user_info["user_id"] is None:
+        if user_info["user_id"] is None or user_info['admin'] != 1:
             return redirect(url_for("home"))
         else:
             user_id = user_info["user_id"]
@@ -296,12 +390,59 @@ def admin():
 
     #Fetching weather data for Sacramento
     weather = fetch_weather()
-    return render_template("admin.html", reports = reports,weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"])
+    return render_template("admin.html", reports = reports,weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"].capitalize())
+
+@app.route("/reload_admin/<admin_id>")
+def reload_admin(admin_id = None):
+    conn = get_db_connection()
+    #Fetching user info through ID rather then login
+    user_info = fetch_user_info_by_id(conn, admin_id)
+
+    #Getting all the necessary information
+    reports = fetch_all_reports(conn)
+    reports = fetch_report_images(conn, reports)
+    
+    conn.close()
+
+    #Fetching weather data for Sacramento
+    weather = fetch_weather()
+    return render_template("admin.html", reports = reports,weather=weather, current_time = datetime.datetime.now().strftime("%I:%M %p"), user_id=user_info["user_id"], user_name=user_info["user_name"].capitalize())
 
 @app.route("/submit_user", methods=["POST"])
 def submit_user():
-    # Logic to handle user submission goes here
-    pass
+    conn = get_db_connection()
+    #Taking the information from the forms and adding the user to the DB
+    user_data = {
+        "username": request.form.get("Username"),
+        "password": request.form.get("Password"),
+        "phone_number" : request.form.get("Phone_Number"),
+        "email" : request.form.get("Email"),
+        "admin": request.form.get("Admin"),
+        "admin_id":request.form.get("Admin_Id")
+    }
+    #Adding the user to the DB
+    add_user(conn, user_data)
+    #Taking login info to redirect admin to main page
+    conn.close()
+    return redirect(url_for("reload_admin", admin_id=user_data["admin_id"]))
+
+@app.route("/admin_update_reports", methods=["POST"])
+def admin_update_reports():
+    #Getting the payload from the request
+    payload = request.get_json() or {}
+    statuses = payload.get("statuses") or []
+    notes = payload.get("notes") or []
+
+    #Connecting to the DB and updating values
+    conn = get_db_connection()
+    for updateStatus in statuses:
+        update_report_status(conn, updateStatus["report_id"], updateStatus["resolved"])
+    for updateNote in notes:
+        update_report_admin_notes(conn, updateNote["report_id"], updateNote["admin_notes"])
+    conn.close()
+
+
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
     app.run()

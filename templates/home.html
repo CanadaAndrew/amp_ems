@@ -20,11 +20,10 @@
 
         <!-- Form inputs to input username and password -->
         <form id="login-form"  method="post" class="flex flex-col items-center gap-3 px-6">
-            <input name="username" placeholder="Username" required
+            <input name="Username" placeholder="Username" required
                    class="w-full md:w-3/4 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-            <input type="password" name="password" placeholder="Password" required
+            <input type="password" name="Password" placeholder="Password" required
                    class="w-full md:w-3/4 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-        
         <!-- Buttons to choose if signing in as a user or admin -->
         <div class="flex justify-evenly mt-4 px-6">
             <button form="login-form" formaction="{{url_for('admin')}}" type="submit" name="role" value="admin"
