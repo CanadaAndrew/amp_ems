@@ -6,6 +6,8 @@ import os
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import requests
+from geopy.geocoders import Nominatim
+from geopy.extra.rate_limiter import RateLimiter
 
 load_dotenv()
 
@@ -25,7 +27,7 @@ def fetch_all_reports(conn):
     # Fetching recent reports to display, getting all reports
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
-        SELECT report_id, category, severity, descr, locat, t_period, resolved, admin_notes
+        SELECT report_id, category, severity, descr, locat, t_period, resolved, admin_notes, latitude, longitude
         FROM Reports
         ORDER BY t_period DESC
                    """)
@@ -44,6 +46,7 @@ def fetch_all_reports(conn):
     #Changing the resolved status for readability
     for report in reports:
         report["resolved"] = "Resolved" if report["resolved"] else "Not Resolved"
+
     cursor.close()
     return reports
 
@@ -318,10 +321,26 @@ def submit_complaint():
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    #Using geopy to get Latitude and Longitude information if possible
+    latitude = None
+    longitude = None
+    geolocator = Nominatim(user_agent="ems_app")
+    geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+    try:
+        location = geocode(report["location"])
+        if location:
+            latitude = round(location.latitude, 6)
+            longitude = round(location.longitude, 6)
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+        latitude = None
+        longitude = None
+    
+
     # Creating the paramertized queries
     query = """
-        INSERT INTO Reports(user_id, category, severity, descr, locat, t_period, resolved) 
-        VALUES(%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO Reports(user_id, category, severity, descr, locat, latitude, longitude, t_period, resolved) 
+        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     img_query = """
@@ -335,7 +354,9 @@ def submit_complaint():
         report["category"],
         int(report["severity"]) if report["severity"] else 1,
         report["description"] or None,
-        report["location"] or "Sacramento",
+        report["location"] or "Sacramento, CA",
+        latitude,
+        longitude,
         report["timestamp"],
         False
         )

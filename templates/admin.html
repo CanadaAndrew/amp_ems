@@ -5,6 +5,12 @@
     <title>Amptier Admin Dashboard Page</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
     <script>
         window.onload = () =>{
             //Getting all the buttons by ID
@@ -168,11 +174,15 @@
             const categoryYValues = categoryXValues.map(category =>
                 document.querySelectorAll(`[data-category="${category}"]`).length
             );
+            //Status chart data
             const statusLabels = ["Resolved", "Not Resolved"];
+            //Using a filter to go through all statuses and selects the resolved ones
             const resolvedCount = statusSelects.filter(s => String(s.value) === "Resolved").length;
+            //Calculating not resolved by taking the amount from the total
             const notResolvedCount = statusSelects.length - resolvedCount;
             const statusData = [resolvedCount, notResolvedCount];
             
+            //Creating the category chart
             if(categoryChartCanvas){
                 new Chart(categoryChartCanvas, {
                     type: "bar",
@@ -198,7 +208,7 @@
                 });
             }
 
-
+            //Creating the status chart
             if(statusChartCanvas){
                 new Chart(statusChartCanvas, {
                 type: "doughnut",
@@ -224,6 +234,23 @@
                 }
             });
             }
+            //Leaflet map initialization
+            const mapElement = document.getElementById('map');
+            const map = L.map(mapElement).setView([38.5781, -121.4944], 12); // Sacramento
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+
+            //Adding markers for each report
+            allReports.forEach((report) =>{
+                const lat = parseFloat(report.getAttribute('data-latitude'));
+                const lon = parseFloat(report.getAttribute('data-longitude'));
+                if(!isNaN(lat) && !isNaN(lon)){
+                    L.marker([lat, lon]).addTo(map)
+                    .bindPopup(`<b>${report.querySelector('h3').textContent}</b><br>${report.querySelector('p:nth-of-type(2)').textContent}`);
+                }
+            });
         }
 
     </script>
@@ -239,7 +266,7 @@
             </div>
         </div>
         <div class = "text-center w-[33vw] py-[4vh]">
-            <h1 class = "text-white text-3xl font-bold">{{ user_name }}'s Admin Dashboard</h1>
+            <h1 class = "text-white text-3xl font-bold"><a href = "{{ url_for('home')}}">{{ user_name }}'s Admin Dashboard</a></h1>
         </div>
     <!--Header displaying Rexus Group and Amptier-->
         <div class = "flex object-contain flex-col w-[33vw] justify-end items-end">
@@ -285,12 +312,12 @@
         <button id = "view_fire" type = "button" class = "m-4 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700">View Fire Reports</button>
         <button id = "view_sewer" type = "button" class = "m-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">View Sewer Reports</button>
         <button id = "view_other" type = "button" class = "m-4 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">View Other Reports</button>
-        <div id = "Admin_Category_Viewer" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-0" hidden>
+        <div id = "Admin_Category_Viewer" class = "fixed inset-0 justify-center justify-items-center items-center bg-black bg-opacity-50 z-[999]" hidden>
         <div class = "bg-white rounded-lg object-center flex flex-col w-[50vw] max-h-[75vh]">
             <h2 id = "admin_category" class="text-center text-2xl text-blue-900 mt-4">Categories</h2>
             <div class="w-full space-y-4 overflow-y-auto h-[60vh] px-4">
                     {% for r in reports %}
-                <div data-category="{{ r['category'] }}" class="report-card bg-white p-4 rounded-md shadow-md border border-black">
+                <div data-category="{{ r['category'] }}" class="report-card bg-white p-4 rounded-md shadow-md border border-black z-[999]" data-latitude="{{ r['latitude'] }}" data-longitude="{{ r['longitude'] }}">
                     <h3 class="text-lg font-semibold text-blue-900">{{ r['category'] }} - Severity {{ r['severity'] }}</h3>
                     <p class="text-gray-700">Reported {{ r['t_diff'] }}</p>
                     <p class="text-gray-600 mt-2">{{ r['descr'] }}</p>
@@ -333,4 +360,5 @@
         <canvas id="status_chart" class = "max-w-[25vw] max-h-[25vh] object-contain h-auto bg-white rounded-lg shadow-md border border-black"></canvas>
     </div>
     <!--Map using Leaflet API to display where everything is located-->
+    <div id="map" class = "relative w-screen h-[35vh] mt-4 object-bottom py-10 z-0"></div>
 </body>
